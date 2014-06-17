@@ -67,31 +67,23 @@ def build_db(cur,handle_data, drop=False):
 			"lines terminated by '\\n'" + \
 			"ignore 1 lines" 
 	cur.execute(stmt)
-def pause_wrapper(x,n):
+def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60 + 2):
 	def decorator(f):
-		config = [x,time.time() + n + 3]
+		config = [remaining,reset_time]
 		def inner(*args,**kwargs):
 			config[0] = config [0]-1
-			if config[0] == 0:
+			if config[0] <= 0:
 				print "limit reached for %s, waiting %s seconds."%(f.__name__, round(config[1]-time.time()))
 				time.sleep(config[1] - time.time())
-				config[0] = x
-				config[1] = time.time() + n + 3
+				config[0] = default_limit
+				config[1] = time.time() + default_reset_window
 			return f(*args,**kwargs)
 		return inner
 	return decorator
 			
-			
-	
-
-	
-	
-	
-		
-
-
 def update(cur, api, wait = 60):
-	cur.execute("select handle from handle where twitterid is null or tweets_count is null limit 1")
+	""" updates db to fill in null values for twitterid or tweets_count """
+	cur.execute("select handle from handle where twitterid is null or tweets_count is null")
 	handles = (r[0] for r in cur.fetchall())
 	
 	for h in handles:
@@ -99,7 +91,14 @@ def update(cur, api, wait = 60):
 		uID = user.id
 		tweets_count = user.statuses_count
 		cur.execute("update handle set twitterid = %s, tweets_count = %s where handle = '%s'"%(uID, tweets_count, h))
-		time.sleep(wait)
+
+def get_api_status():
+	""" prints all api method statuses that are not at full quota"""
+	lstatus = api.rate_limit_status()['resources']
+        for r in lstatus:
+                for m in lstatus[r]:
+                        if lstatus[r][m]['limit'] != lstatus[r][m]['remaining']:
+                                print r, m, lstatus[r][m]
 		
 	
 
@@ -119,21 +118,23 @@ if __name__ == "__main__":
 
 	api = tweepy.API(auth)
 
-#	for i in range(3):
-#		api.get_user('EGJYP')
-#	lstatus = api.rate_limit_status()['resources']
-#	for r in lstatus:
-#		for m in lstatus[r]:
-#			if lstatus[r][m]['limit'] != lstatus[r][m]['remaining']:
-#				print r, m, lstatus[r][m]
+
+	# remake api functions to respect rate limits.  
+	lstatus = api.rate_limit_status()['resources']
+
+	remaining, reset_time = lstatus["users"]["/users/show/:id"]["remaining"], lstatus["users"]["/users/show/:id"]["reset"]
+
 	
-	
+	api.get_user = pause_wrapper(remaining = remaining, reset_time = reset_time)(api.get_user)
+	api.followers_ids = pause_wrapper()(api.followers_ids)
 
 
-	#con,cur = db_connect("tomb", "Tolley0!",host="184.105.184.30")
-	#build_db(cur, "twitter_handles.csv", True)
-	#update(cur,api,1)
+	con,cur = db_connect("tomb", "Tolley0!",host="184.105.184.30")
+	build_db(cur, "twitter_handles.csv", True)
+	update(cur,api,1)
 	
-	#if con:
-	#	con.commit()
-	#	con.close()	
+	get_api_status()
+	
+	if con:
+		con.commit()
+		con.close()	
