@@ -9,11 +9,12 @@ filterwarnings('ignore', category = mdb.Warning)
 
 
 
-def get_subscribers(screen_name):
+
+def get_subscribers(identifier):
 	ids = []
-	for page in tweepy.Cursor(api.followers_ids, screen_name = screen_name).pages():
+
+	for page in tweepy.Cursor(api.followers_ids, id = identifier).pages():
 		ids.extend(page)
-		time.sleep(60)
 	return ids
 
 
@@ -101,7 +102,33 @@ def get_api_status():
                                 print r, m, lstatus[r][m]
 		
 	
+def insert_followers(cur,followed_id, followers):
+	for f in followers:
+		cur.execute("INSERT IGNORE INTO follower (followerID, followedID, date_observed) VALUES (%s,%s,NOW())"%(f,followed_id)
 
+def insert_all_followrs(cur, verbose = False):
+	cur.execute("SELECT twitterID FROM handle")
+	twitterIds = [h[0] for h in cur.fetchall()] 
+	
+	if verbose: print "Inserting followerIDs for %s handles"%len(twitterIds)
+	i = 0
+	for tId in twitterIds:
+		if verbose and i%10==0: print "\t%s of %s complete."%(i,len(twitterIds))	
+		followerIds = get_subscribers(tId)
+		insert_followers(cur,tId,followerIds) 
+		i += 1
+	
+	
+def test():
+#	get_subscribers("hallo1246")
+	api.followers_ids(screen_name="hallo126")
+	get_api_status()
+
+# 1. Populated handle DB.
+# 2. For each handle, extract followers list
+# 3. For overall list of handles, get overlap of each team
+# 4. For overall list of handles, model on which factors most predict hyperx follower
+# 5. For each team, model what predicts overlap of twitter followers.
 
 
 if __name__ == "__main__":
@@ -123,17 +150,21 @@ if __name__ == "__main__":
 	lstatus = api.rate_limit_status()['resources']
 
 	remaining, reset_time = lstatus["users"]["/users/show/:id"]["remaining"], lstatus["users"]["/users/show/:id"]["reset"]
-
-	
 	api.get_user = pause_wrapper(remaining = remaining, reset_time = reset_time)(api.get_user)
-	api.followers_ids = pause_wrapper()(api.followers_ids)
+
+	remaining, reset_time = lstatus["followers"]["/followers/ids"]["remaining"], lstatus["followers"]["/followers/ids"]["reset"]
+	api.followers_ids = pause_wrapper(remaining = remaining, reset_time = reset_time, default_limit = 15)(api.followers_ids)
 
 
-	con,cur = db_connect("tomb", "Tolley0!",host="184.105.184.30")
-	build_db(cur, "twitter_handles.csv", True)
+	con,cur = db_connect("tomb", "Tolley0!",host="localhost")
+
+	# 1. Populated handle DB
+	build_db(cur, "twitter_handles.csv", False)
 	update(cur,api,1)
+
+	# 2. For each handle, extract followers list 
+	insert_all_followers(cur)
 	
-	get_api_status()
 	
 	if con:
 		con.commit()
