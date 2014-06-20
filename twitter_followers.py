@@ -74,16 +74,16 @@ def build_db(cur,handle_data, drop=False):
 			"lines terminated by '\\n'" + \
 			"ignore 1 lines" 
 	cur.execute(stmt)
-def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60 + 2):
+def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60 + 2, grace_period = 5):
 	def decorator(f):
-		config = [remaining,reset_time]
+		config = [remaining,reset_time + grace_period]
 		def inner(*args,**kwargs):
 			config[0] = config [0]-1
 			if config[0] <= 0:
 				print "limit reached for %s, waiting %s seconds."%(f.__name__, round(config[1]-time.time()))
 				time.sleep(config[1] - time.time())
 				config[0] = default_limit
-				config[1] = time.time() + default_reset_window
+				config[1] = time.time() + default_reset_window + grace_period
 			return f(*args,**kwargs)
 		return inner
 	return decorator
@@ -112,7 +112,7 @@ def insert_followers(cur,followed_id, followers):
 	for f in followers:
 		cur.execute("INSERT IGNORE INTO follower (followerID, followedID, date_observed) VALUES (%s,%s,NOW())"%(f,followed_id))
 
-def insert_all_followrs(cur, verbose = False):
+def insert_all_followers(cur, verbose = False):
 	cur.execute("SELECT twitterID FROM handle")
 	twitterIds = [h[0] for h in cur.fetchall()] 
 	
