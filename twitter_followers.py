@@ -12,9 +12,15 @@ filterwarnings('ignore', category = mdb.Warning)
 
 def get_subscribers(identifier):
 	ids = []
-
-	for page in tweepy.Cursor(api.followers_ids, id = identifier).pages():
-		ids.extend(page)
+	page = 1
+	
+	while True:
+		followers = api.followers_ids(id=identifier,page=page)	
+		if followers:
+			ids.extend(page)
+		else:
+			break
+		page += 1
 	return ids
 
 
@@ -104,7 +110,7 @@ def get_api_status():
 	
 def insert_followers(cur,followed_id, followers):
 	for f in followers:
-		cur.execute("INSERT IGNORE INTO follower (followerID, followedID, date_observed) VALUES (%s,%s,NOW())"%(f,followed_id)
+		cur.execute("INSERT IGNORE INTO follower (followerID, followedID, date_observed) VALUES (%s,%s,NOW())"%(f,followed_id))
 
 def insert_all_followrs(cur, verbose = False):
 	cur.execute("SELECT twitterID FROM handle")
@@ -159,10 +165,13 @@ if __name__ == "__main__":
 	con,cur = db_connect("tomb", "Tolley0!",host="localhost")
 
 	# 1. Populated handle DB
+	print "Building db..."
 	build_db(cur, "twitter_handles.csv", False)
+	print "updating missing ids and tweet counts..."
 	update(cur,api,1)
 
 	# 2. For each handle, extract followers list 
+	print "extracting followers..."
 	insert_all_followers(cur)
 	
 	
