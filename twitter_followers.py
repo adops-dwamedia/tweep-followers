@@ -17,7 +17,7 @@ def get_subscribers(identifier):
 	while True:
 		followers = api.followers_ids(id=identifier,page=page)	
 		if followers:
-			ids.extend(page)
+			ids.extend(followers)
 		else:
 			break
 		page += 1
@@ -47,7 +47,7 @@ def build_db(cur,handle_data, drop=False):
 	stmt = "create table if not exists handle" + \
 			"(" + \
 			"handle VARCHAR(255)," + \
-			"twitterid INT," + \
+			"twitterid VARCHAR(32)," + \
 			"url VARCHAR(255)," + \
 			"team_individual VARCHAR(255)," + \
 			"team VARCHAR(255)," + \
@@ -61,8 +61,8 @@ def build_db(cur,handle_data, drop=False):
 
 	stmt = "create table if not exists follower " + \
 			"(" + \
-			"followerID INT," + \
-			"followedID INT," + \
+			"followerID VARCHAR(255)," + \
+			"followedID VARCHAR(255)," + \
 			"date_observed DATETIME," +\
 			"PRIMARY KEY (followerID, followedID)" +\
 			");"
@@ -80,7 +80,7 @@ def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60
 		def inner(*args,**kwargs):
 			config[0] = config [0]-1
 			if config[0] <= 0:
-				print "limit reached for %s, waiting %s seconds."%(f.__name__, round(config[1]-time.time()))
+				print "limit reached for %s, waiting %s minutes."%(f.__name__, round(config[1]-time.time())/60)
 				time.sleep(config[1] - time.time())
 				config[0] = default_limit
 				config[1] = time.time() + default_reset_window + grace_period
@@ -169,11 +169,11 @@ if __name__ == "__main__":
 	build_db(cur, "twitter_handles.csv", False)
 	print "updating missing ids and tweet counts..."
 	update(cur,api,1)
-
+	con.commit()
 	# 2. For each handle, extract followers list 
 	print "extracting followers..."
 	insert_all_followers(cur)
-	
+	con.commit()	
 	
 	if con:
 		con.commit()
