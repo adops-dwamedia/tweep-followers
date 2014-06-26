@@ -74,14 +74,27 @@ def build_db(cur,handle_data, drop=False):
 			"lines terminated by '\\n'" + \
 			"ignore 1 lines" 
 	cur.execute(stmt)
+def wait(secs):
+	if secs <= 60:
+		print "waiting %s seconds"%secs
+	else:
+		mins = secs / 60
+		remaind = secs%60
+		print "waiting %s minutes"%(round(secs/60.0,2))
+		time.sleep(remaind)
+		for i in reversed(range(mins)):
+			print "\t%s min remaining"%(i + 1)
+			time.sleep(60)
+
+
 def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60 + 2, grace_period = 5):
 	def decorator(f):
 		config = [remaining,reset_time + grace_period]
 		def inner(*args,**kwargs):
 			config[0] = config [0]-1
 			if config[0] <= 0:
-				print "limit reached for %s, waiting %s minutes."%(f.__name__, round(config[1]-time.time())/60)
-				time.sleep(config[1] - time.time())
+				print "limit reached for Twitter API method."
+				wait(config[1]-time.time())
 				config[0] = default_limit
 				config[1] = time.time() + default_reset_window + grace_period
 			return f(*args,**kwargs)
