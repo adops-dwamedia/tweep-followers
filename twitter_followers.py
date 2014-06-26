@@ -75,6 +75,8 @@ def build_db(cur,handle_data, drop=False):
 			"ignore 1 lines" 
 	cur.execute(stmt)
 def wait(secs):
+	if type(secs) is not int:
+		secs = int(secs)
 	if secs <= 60:
 		print "waiting %s seconds"%secs
 	else:
