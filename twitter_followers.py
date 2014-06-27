@@ -3,6 +3,7 @@ import time
 import sys
 import MySQLdb as mdb
 import json
+import os
 
 from warnings import filterwarnings
 filterwarnings('ignore', category = mdb.Warning)
@@ -153,7 +154,7 @@ def test():
 
 
 if __name__ == "__main__":
-	with open('twitter.json') as f:
+	with open(os.path.dirname(os.path.realpath(__file__)) + "/" + 'twitter.json') as f:
 		auths = json.loads(f.read())
 
 	consumer_key = auths["consumer_key"]
@@ -181,7 +182,7 @@ if __name__ == "__main__":
 
 	# 1. Populated handle DB
 	print "Building db..."
-	build_db(cur, "twitter_handles.csv", False)
+	build_db(cur, os.path.dirname(os.path.realpath(__file__)) + "/" + "twitter_handles.csv", False)
 	print "updating missing ids and tweet counts..."
 	update(cur,api,1)
 	con.commit()
