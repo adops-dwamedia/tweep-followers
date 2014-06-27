@@ -128,7 +128,7 @@ def insert_followers(cur,followed_id, followers):
 	for f in followers:
 		cur.execute("INSERT IGNORE INTO follower (followerID, followedID, date_observed) VALUES (%s,%s,NOW())"%(f,followed_id))
 
-def insert_all_followers(cur, verbose = False):
+def insert_all_followers(cur, con, verbose = False):
 	cur.execute("SELECT twitterID FROM handle")
 	twitterIds = [h[0] for h in cur.fetchall()] 
 	
@@ -138,6 +138,7 @@ def insert_all_followers(cur, verbose = False):
 		if verbose and i%10==0: print "\t%s of %s complete."%(i,len(twitterIds))	
 		followerIds = get_subscribers(tId)
 		insert_followers(cur,tId,followerIds) 
+		con.commit()
 		i += 1
 	
 	
@@ -188,7 +189,7 @@ if __name__ == "__main__":
 	con.commit()
 	# 2. For each handle, extract followers list 
 	print "extracting followers..."
-	insert_all_followers(cur)
+	insert_all_followers(cur,con)
 	con.commit()	
 	
 	if con:
