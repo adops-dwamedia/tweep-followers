@@ -90,7 +90,7 @@ def wait(secs):
 			time.sleep(60)
 
 
-def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60 + 2, grace_period = 5):
+def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60 + 2, grace_period = 60):
 	def decorator(f):
 		config = [remaining,reset_time + grace_period]
 		def inner(*args,**kwargs):
