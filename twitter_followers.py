@@ -56,6 +56,7 @@ def build_db(cur,handle_data, drop=False):
 			"hyperx_logo TINYINT," + \
 			"hyperx_logo_featured TINYINT," + \
 			"tweets_count INT," + \
+			"followers_updated DATE," + \
 			"PRIMARY KEY (handle)" + \
 			");"
 	cur.execute(stmt)
@@ -75,29 +76,16 @@ def build_db(cur,handle_data, drop=False):
 			"lines terminated by '\\n'" + \
 			"ignore 1 lines" 
 	cur.execute(stmt)
-def wait(secs):
-	if type(secs) is not int:
-		secs = int(secs)
-	if secs <= 60:
-		print "waiting %s seconds"%secs
-	else:
-		mins = secs / 60
-		remaind = secs%60
-		print "waiting %s minutes"%(round(secs/60.0,2))
-		time.sleep(remaind)
-		for i in reversed(range(mins)):
-			print "\t%s min remaining"%(i + 1)
-			time.sleep(60)
 
-
-def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60 + 2, grace_period = 60):
+def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60, grace_period = 60):
 	def decorator(f):
 		config = [remaining,reset_time + grace_period]
 		def inner(*args,**kwargs):
 			config[0] = config [0]-1
 			if config[0] <= 0:
 				print "limit reached for Twitter API method."
-				wait(config[1]-time.time())
+				print "waiting %s seconds"%(config[1]-time.time())
+				time.sleep(config[1] - time.time())
 				config[0] = default_limit
 				config[1] = time.time() + default_reset_window + grace_period
 			return f(*args,**kwargs)
@@ -128,8 +116,9 @@ def insert_followers(cur,followed_id, followers):
 	for f in followers:
 		cur.execute("INSERT IGNORE INTO follower (followerID, followedID, date_observed) VALUES (%s,%s,NOW())"%(f,followed_id))
 
-def insert_all_followers(cur, con, verbose = False):
-	cur.execute("SELECT twitterID FROM handle")
+def insert_all_followers(cur, con, lookback = 7, verbose = False):
+	""" inserts followerships for handles that have either never been updated, or not updated in the past LOOKBACK days """
+	cur.execute("SELECT twitterID FROM handle where followers_updated IS NULL OR followers_updated < DATE_ADD(NOW(), INTERVAL -%s DAY)"%lookback)
 	twitterIds = [h[0] for h in cur.fetchall()] 
 	
 	if verbose: print "Inserting followerIDs for %s handles"%len(twitterIds)
@@ -138,6 +127,7 @@ def insert_all_followers(cur, con, verbose = False):
 		if verbose and i%10==0: print "\t%s of %s complete."%(i,len(twitterIds))	
 		followerIds = get_subscribers(tId)
 		insert_followers(cur,tId,followerIds) 
+		cur.execute("UPDATE handle SET followers_updated = NOW() WHERE twitterID = %s"%tId)
 		con.commit()
 		i += 1
 	
@@ -183,13 +173,13 @@ if __name__ == "__main__":
 
 	# 1. Populated handle DB
 	print "Building db..."
-	build_db(cur, os.path.dirname(os.path.realpath(__file__)) + "/" + "twitter_handles.csv", False)
+	build_db(cur, os.path.dirname(os.path.realpath(__file__)) + "/" + "twitter_handles.csv", True)
 	print "updating missing ids and tweet counts..."
 	update(cur,api,1)
 	con.commit()
 	# 2. For each handle, extract followers list 
 	print "extracting followers..."
-	insert_all_followers(cur,con)
+	insert_all_followers(cur,con, True)
 	con.commit()	
 	
 	if con:
