@@ -13,10 +13,13 @@ filterwarnings('ignore', category = mdb.Warning)
 
 def get_subscribers(identifier):
 	ids = []
+	next_cursor = -1
+	print "\n\ngetting ids for user %s"%identifier	
 	page = 1
-	
 	while True:
-		followers = api.followers_ids(id=identifier,page=page)	
+		print "cursor = ", next_cursor
+		print "retrieving page %s"%page
+		followers,(prev_cursor, next_cursor) = api.followers_ids(id=identifier,cursor=next_cursor)	
 		if followers:
 			ids.extend(followers)
 		else:
@@ -77,21 +80,20 @@ def build_db(cur,handle_data, drop=False):
 			"ignore 1 lines" 
 	cur.execute(stmt)
 
-def pause_wrapper(default_limit=180, remaining=180, default_reset_window = 15*60 + 2, reset_time= time.time() + 15*60, grace_period = 60):
-	def decorator(f):
-		config = [remaining,reset_time + grace_period]
-		def inner(*args,**kwargs):
-			config[0] = config [0]-1
-			if config[0] <= 0:
-				print "limit reached for Twitter API method."
-				print "waiting %s seconds"%(config[1]-time.time())
-				time.sleep(config[1] - time.time())
-				config[0] = default_limit
-				config[1] = time.time() + default_reset_window + grace_period
+def pause_wrapper(f):
+	def inner(*args,**kwargs):
+		try:
 			return f(*args,**kwargs)
-		return inner
-	return decorator
-			
+                except tweepy.TweepError,e:
+                        if e[0][0]['code'] == 88:
+                                print "api limit reached, pausing 16 minutes"
+                                time.sleep(16*60)
+                                return inner(*args,**kwargs)
+                        else:
+                                raise
+	return inner
+
+	
 def update(cur, api, wait = 60):
 	""" updates db to fill in null values for twitterid or tweets_count """
 	cur.execute("select handle from handle where twitterid is null or tweets_count is null")
@@ -121,7 +123,7 @@ def insert_all_followers(cur, con, lookback = 7, verbose = False):
 	cur.execute("SELECT twitterID FROM handle where followers_updated IS NULL OR followers_updated < DATE_ADD(NOW(), INTERVAL -%s DAY)"%lookback)
 	twitterIds = [h[0] for h in cur.fetchall()] 
 	
-	if verbose: print "Inserting followerIDs for %s handles"%len(twitterIds)
+	if verbose: print "\n\nInserting followerIDs for %s handles"%len(twitterIds)
 	i = 0
 	for tId in twitterIds:
 		if verbose and i%10==0: print "\t%s of %s complete."%(i,len(twitterIds))	
@@ -130,6 +132,7 @@ def insert_all_followers(cur, con, lookback = 7, verbose = False):
 		cur.execute("UPDATE handle SET followers_updated = NOW() WHERE twitterID = %s"%tId)
 		con.commit()
 		i += 1
+		print "data for user %s complete"%tId
 	
 	
 def test():
@@ -159,21 +162,16 @@ if __name__ == "__main__":
 	api = tweepy.API(auth)
 
 
-	# remake api functions to respect rate limits.  
-	lstatus = api.rate_limit_status()['resources']
+	api.get_user = pause_wrapper(api.get_user)
 
-	remaining, reset_time = lstatus["users"]["/users/show/:id"]["remaining"], lstatus["users"]["/users/show/:id"]["reset"]
-	api.get_user = pause_wrapper(remaining = remaining, reset_time = reset_time)(api.get_user)
-
-	remaining, reset_time = lstatus["followers"]["/followers/ids"]["remaining"], lstatus["followers"]["/followers/ids"]["reset"]
-	api.followers_ids = pause_wrapper(remaining = remaining, reset_time = reset_time, default_limit = 15)(api.followers_ids)
+	api.followers_ids = pause_wrapper(api.followers_ids)
 
 
 	con,cur = db_connect("tomb", "Tolley0!",host="localhost")
 
 	# 1. Populated handle DB
 	print "Building db..."
-	build_db(cur, os.path.dirname(os.path.realpath(__file__)) + "/" + "twitter_handles.csv", True)
+	build_db(cur, os.path.dirname(os.path.realpath(__file__)) + "/" + "twitter_handles.csv", False)
 	print "updating missing ids and tweet counts..."
 	update(cur,api,1)
 	con.commit()

@@ -8,7 +8,18 @@ import os
 from warnings import filterwarnings
 filterwarnings('ignore', category = mdb.Warning)
 
-
+def pause_wrapper(f):
+	def inner(*args, **kwargs):
+		try:
+			return f(*args,**kwargs)
+		except tweepy.TweepError,e:
+			if e[0][0]['code'] == 88:
+				print "api limit reached, pausing 16 minutes"
+				time.sleep(16*60)
+				return inner(*args,**kwargs)
+			else:
+				raise
+	return inner
 def get_subscribers(identifier):
 	ids = []
 	page = 1
