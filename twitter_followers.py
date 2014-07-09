@@ -120,7 +120,8 @@ def insert_followers(cur,followed_id, followers):
 
 def insert_all_followers(cur, con, lookback = 7, verbose = False):
 	""" inserts followerships for handles that have either never been updated, or not updated in the past LOOKBACK days """
-	cur.execute("SELECT twitterID FROM handle where followers_updated IS NULL OR followers_updated < DATE_ADD(NOW(), INTERVAL -%s DAY)"%lookback)
+	stmt = "SELECT twitterID FROM handle where followers_updated IS NULL OR followers_updated < DATE_ADD(NOW(), INTERVAL -%s DAY)"%lookback
+	cur.execute(stmt)
 	twitterIds = [h[0] for h in cur.fetchall()] 
 	
 	if verbose: print "\n\nInserting followerIDs for %s handles"%len(twitterIds)
@@ -177,7 +178,7 @@ if __name__ == "__main__":
 	con.commit()
 	# 2. For each handle, extract followers list 
 	print "extracting followers..."
-	insert_all_followers(cur,con, True)
+	insert_all_followers(cur,con, verbose = True)
 	con.commit()	
 	
 	if con:
