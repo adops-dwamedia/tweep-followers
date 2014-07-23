@@ -137,15 +137,8 @@ def insert_all_followers(cur, con, lookback = 14, verbose = False):
 	
 	
 def test():
-#	get_subscribers("hallo1246")
 	api.followers_ids(screen_name="hallo126")
 	get_api_status()
-
-# 1. Populated handle DB.
-# 2. For each handle, extract followers list
-# 3. For overall list of handles, get overlap of each team
-# 4. For overall list of handles, model on which factors most predict hyperx follower
-# 5. For each team, model what predicts overlap of twitter followers.
 
 
 if __name__ == "__main__":
