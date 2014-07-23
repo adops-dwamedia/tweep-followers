@@ -118,7 +118,7 @@ def insert_followers(cur,followed_id, followers):
 	for f in followers:
 		cur.execute("INSERT IGNORE INTO follower (followerID, followedID, date_observed) VALUES (%s,%s,NOW())"%(f,followed_id))
 
-def insert_all_followers(cur, con, lookback = 7, verbose = False):
+def insert_all_followers(cur, con, lookback = 14, verbose = False):
 	""" inserts followerships for handles that have either never been updated, or not updated in the past LOOKBACK days """
 	stmt = "SELECT twitterID FROM handle where followers_updated IS NULL OR followers_updated < DATE_ADD(NOW(), INTERVAL -%s DAY)"%lookback
 	cur.execute(stmt)
